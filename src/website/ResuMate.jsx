@@ -371,7 +371,7 @@ export default function ResuMate() {
                   </span>
                 ))}
               </h1>
-              <p className="mt-6 max-w-[480px] animate-[rm-fade_0.9s_0.6s_forwards] text-[1.12rem] text-[#4a5a70] opacity-0">
+              <p className="mt-10 max-w-[480px] animate-[rm-fade_0.9s_0.6s_forwards] text-[1.12rem] text-[#4a5a70] opacity-0">
                 Build a polished, professional resume and cover letter in minutes. Choose a template, add your
                 story, and download it ready to send.
               </p>
