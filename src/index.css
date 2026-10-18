@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Jost:wght@400;500;600&family=Lora:wght@400;600&family=Playfair+Display:wght@400;600&family=Montserrat:wght@400;600&family=DM+Sans:wght@400;600&family=Libre+Baskerville:wght@400;700&family=Raleway:wght@400;600&family=Cormorant+Garamond:wght@500;600&display=swap');
+@import "tailwindcss";
+
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes rm-rise {
+  to { opacity: 1; transform: none; }
+}
+@keyframes rm-fade {
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
