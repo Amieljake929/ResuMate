@@ -4,13 +4,17 @@ import SignIn from './signin/SignIn'
 import SignUp from './signup/SignUp'
 import ResumeTemplates from './editing/ResumeTemplates'
 import ResumeEditing from './editing/ResumeEditing'
+import ProtectedRoute from './lib/ProtectedRoute'
+import DashboardLayout from './dashboard/DashboardLayout'
+import DashboardHome from './dashboard/DashboardHome'
+import Placeholder from './dashboard/Placeholder'
 import './App.css'
 
-// Temporary placeholder until your dashboard page is built
-const Placeholder = ({ title }) => (
+// Simple 404 page
+const NotFound = () => (
   <div style={{ padding: '4rem 1.5rem', textAlign: 'center' }}>
-    <h1>{title}</h1>
-    <p>This page is coming soon.</p>
+    <h1>Page not found</h1>
+    <p>The page you're looking for doesn't exist.</p>
     <Link to="/">Back to home</Link>
   </div>
 )
@@ -22,11 +26,25 @@ function App() {
         <Route path="/" element={<ResuMate />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route path="/templates" element={<ResumeTemplates />} />
+          <Route path="/templates" element={<ProtectedRoute><ResumeTemplates /></ProtectedRoute>} />
         <Route path="/editing" element={<ResumeEditing />} />
         <Route path="/editing/:templateId" element={<ResumeEditing />} />
-        <Route path="/dashboard" element={<Placeholder title="Dashboard" />} />
-        <Route path="*" element={<Placeholder title="Page not found" />} />
+
+        {/* Protected dashboard: only logged-in users can open these */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<DashboardHome />} />
+          <Route path="resumes" element={<Placeholder title="My Resumes" />} />
+          <Route path="settings" element={<Placeholder title="Settings" />} />
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )
