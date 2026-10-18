@@ -42,7 +42,7 @@ export default function SignUp() {
       return
     }
 
-    navigate('/templates')
+    navigate('/signin')
   }
 
   return (

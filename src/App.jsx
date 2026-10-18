@@ -7,6 +7,8 @@ import ResumeEditing from './editing/ResumeEditing'
 import ProtectedRoute from './lib/ProtectedRoute'
 import DashboardLayout from './dashboard/DashboardLayout'
 import DashboardHome from './dashboard/DashboardHome'
+import DashboardTemplates from './dashboard/DashboardTemplates'
+import DashboardResumeEditing from './dashboard/ResumeEditing'
 import Placeholder from './dashboard/Placeholder'
 import './App.css'
 
@@ -26,7 +28,7 @@ function App() {
         <Route path="/" element={<ResuMate />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
-          <Route path="/templates" element={<ProtectedRoute><ResumeTemplates /></ProtectedRoute>} />
+        <Route path="/templates" element={<ProtectedRoute><ResumeTemplates /></ProtectedRoute>} />
         <Route path="/editing" element={<ResumeEditing />} />
         <Route path="/editing/:templateId" element={<ResumeEditing />} />
 
@@ -40,7 +42,10 @@ function App() {
           }
         >
           <Route index element={<DashboardHome />} />
-          <Route path="resumes" element={<Placeholder title="My Resumes" />} />
+          <Route path="templates" element={<DashboardTemplates />} />
+          <Route path="editor" element={<DashboardResumeEditing />} />
+          <Route path="editor/:templateId" element={<DashboardResumeEditing />} />
+          <Route path="resumes" element={<Placeholder title="My Resumes" description="Your saved resumes will appear here." />} />
           <Route path="settings" element={<Placeholder title="Settings" />} />
         </Route>
 
