@@ -284,7 +284,7 @@ export function AuthFrame({ children, formKey }) {
         <div className="mx-auto w-full max-w-[520px] self-start px-6 pt-[clamp(0.5rem,4vh,2rem)] sm:px-10 lg:mx-0 lg:max-w-[580px] lg:px-0 lg:pr-[clamp(2rem,6vw,6rem)] lg:pt-[clamp(1rem,16vh,9rem)]">
           {/* small screens only: logo above the heading (left side is hidden there) */}
           <Link to="/" aria-label="ResuMate home" className="mx-auto mb-8 block w-fit lg:hidden">
-            <img src="/logo/resumate.png" alt="ResuMate" className="block h-16 w-auto sm:h-20" />
+            <img src="/logo/resumate.png" alt="ResuMate" className="block h-20 w-auto" />
           </Link>
 
           {/* only this part re-fades when the route changes */}
@@ -315,7 +315,7 @@ export function AuthLayout() {
 export function AuthSplit({ title, subtitle, className = '', children }) {
   return (
     <div className={className}>
-      <h1 className={`${DISPLAY} text-[clamp(2rem,5.4vh,3.1rem)] font-light leading-tight tracking-tight text-[#0b1f3a]`}>
+      <h1 className={`${DISPLAY} text-2xl font-light leading-tight tracking-tight text-[#0b1f3a] sm:text-[clamp(2rem,5.4vh,3.1rem)]`}>
         {title}
       </h1>
       {subtitle && (

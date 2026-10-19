@@ -49,7 +49,7 @@ export default function SignIn() {
 
       {/* the Sign in form is shorter than Sign up, so nudge it down on desktop to sit level with the logo */}
       <AuthSplit
-        title="Welcome back"
+        title="Log in to continue"
         subtitle="Sign in to continue building your resume."
         className="lg:mt-[clamp(0px,7vh,4rem)]"
       >

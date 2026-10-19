@@ -65,3 +65,27 @@ export const FileIcon = (p) => (
     <path d="M14 3v5h5" />
   </Icon>
 )
+export const BellIcon = (p) => (
+  <Icon {...p}>
+    <path d="M6 9a6 6 0 0112 0c0 5 2 6.5 2 6.5H4S6 14 6 9z" />
+    <path d="M10 19a2 2 0 004 0" />
+  </Icon>
+)
+export const UserIcon = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />
+  </Icon>
+)
+export const HelpIcon = (p) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1.1-1.5 2.2" />
+    <path d="M12 17h.01" />
+  </Icon>
+)
+export const ChevronDownIcon = (p) => (
+  <Icon {...p}>
+    <path d="M6 9l6 6 6-6" />
+  </Icon>
+)
