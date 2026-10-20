@@ -19,9 +19,9 @@ const greeting = () => {
 
 const ACTIONS = [
   { to: '/dashboard/templates', icon: PlusIcon, title: 'Create a resume', text: 'Pick a template and start building.' },
-  { to: '/dashboard/cover-letters', icon: LetterIcon, title: 'Write a cover letter', text: 'Match it to your resume.', soon: true },
+  { to: '/dashboard/cover-letters', icon: LetterIcon, title: 'Write a cover letter', text: 'Match it to your resume.' },
   { to: '/dashboard/resumes', icon: ActivityIcon, title: 'My activities', text: 'Continue where you left off.' },
-  { to: '/dashboard/ats-checker', icon: ShieldCheckIcon, title: 'Check ATS score', text: 'See how bots read your resume.', soon: true },
+  { to: '/dashboard/ats-checker', icon: ShieldCheckIcon, title: 'Check ATS score', text: 'See how bots read your resume.' },
 ]
 
 const TIPS = [
@@ -150,11 +150,7 @@ export default function DashboardHome() {
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#eef4fa] transition-colors duration-300 group-hover:bg-[#0b1f3a] group-hover:text-white">
                   <a.icon className="h-5 w-5" />
                 </span>
-                {a.soon ? (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">Soon</span>
-                ) : (
-                  <ArrowRightIcon className="h-5 w-5 text-slate-400 transition duration-300 group-hover:translate-x-1 group-hover:text-black" />
-                )}
+                <ArrowRightIcon className="h-5 w-5 text-slate-400 transition duration-300 group-hover:translate-x-1 group-hover:text-black" />
               </div>
               <p className="mt-5 font-semibold text-slate-900">{a.title}</p>
               <p className="mt-0.5 text-sm text-slate-600">{a.text}</p>

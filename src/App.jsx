@@ -20,6 +20,10 @@ const DashboardHome = lazy(() => import('./dashboard/DashboardHome'))
 const DashboardTemplates = lazy(() => import('./dashboard/DashboardTemplates'))
 const DashboardResumeEditing = lazy(() => import('./dashboard/ResumeEditing'))
 const MyActivities = lazy(() => import('./dashboard/MyActivities'))
+const CoverLetter = lazy(() => import('./dashboard/CoverLetter'))
+const AtsChecker = lazy(() => import('./dashboard/AtsChecker'))
+const JobTracker = lazy(() => import('./dashboard/JobTracker'))
+const InterviewPrep = lazy(() => import('./dashboard/InterviewPrep'))
 
 // Simple 404 page
 const NotFound = () => (
@@ -63,6 +67,10 @@ function App() {
             <Route path="editor" element={<DashboardResumeEditing />} />
             <Route path="editor/:templateId" element={<DashboardResumeEditing />} />
             <Route path="resumes" element={<MyActivities />} />
+            <Route path="cover-letters" element={<CoverLetter />} />
+            <Route path="ats-checker" element={<AtsChecker />} />
+            <Route path="job-tracker" element={<JobTracker />} />
+            <Route path="interview-prep" element={<InterviewPrep />} />
             <Route path="settings" element={<Placeholder title="Settings" />} />
           </Route>
 

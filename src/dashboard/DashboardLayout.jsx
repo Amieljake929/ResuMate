@@ -28,23 +28,22 @@ const SidebarToggleIcon = (p) => (
   </Icon>
 )
 
-// `soon: true` links are placeholders until their pages exist.
 const NAV = [
   {
     label: 'Build',
     items: [
       { to: '/dashboard', label: 'Overview', icon: HomeIcon, end: true },
       { to: '/dashboard/templates', label: 'Resume Templates', icon: TemplateIcon, alsoActiveOnEditor: true },
-      { to: '/dashboard/cover-letters', label: 'Cover Letter Templates', icon: LetterIcon, soon: true },
+      { to: '/dashboard/cover-letters', label: 'Cover Letter Templates', icon: LetterIcon },
       { to: '/dashboard/resumes', label: 'My Activities', icon: ActivityIcon },
     ],
   },
   {
     label: 'Career tools',
     items: [
-      { to: '/dashboard/ats-checker', label: 'ATS Checker', icon: ShieldCheckIcon, soon: true },
-      { to: '/dashboard/job-tracker', label: 'Job Tracker', icon: BriefcaseIcon, soon: true },
-      { to: '/dashboard/interview-prep', label: 'Interview Prep', icon: ChatIcon, soon: true },
+      { to: '/dashboard/ats-checker', label: 'ATS Checker', icon: ShieldCheckIcon },
+      { to: '/dashboard/job-tracker', label: 'Job Tracker', icon: BriefcaseIcon },
+      { to: '/dashboard/interview-prep', label: 'Interview Prep', icon: ChatIcon },
     ],
   },
 ]
@@ -338,11 +337,6 @@ export default function DashboardLayout() {
                             )}
                             <l.icon className="relative h-5 w-5 shrink-0 text-black" />
                             <span className={`relative ml-3 whitespace-nowrap ${fade}`}>{l.label}</span>
-                            {l.soon && (
-                              <span className={`relative ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 ${fade}`}>
-                                Soon
-                              </span>
-                            )}
                           </>
                         )
                       }}
