@@ -89,3 +89,43 @@ export const ChevronDownIcon = (p) => (
     <path d="M6 9l6 6 6-6" />
   </Icon>
 )
+export const LetterIcon = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </Icon>
+)
+export const ActivityIcon = (p) => (
+  <Icon {...p}>
+    <path d="M3 12h4l3-8 4 16 3-8h4" />
+  </Icon>
+)
+export const ShieldCheckIcon = (p) => (
+  <Icon {...p}>
+    <path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z" />
+    <path d="M8.5 12l2.5 2.5 4.5-5" />
+  </Icon>
+)
+export const BriefcaseIcon = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="7" width="18" height="13" rx="2" />
+    <path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 13h18" />
+  </Icon>
+)
+export const ChatIcon = (p) => (
+  <Icon {...p}>
+    <path d="M4 5h16v11H9l-5 4z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </Icon>
+)
+export const SparkIcon = (p) => (
+  <Icon {...p}>
+    <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+    <path d="M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" />
+  </Icon>
+)
+export const CheckIcon = (p) => (
+  <Icon {...p}>
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </Icon>
+)

@@ -11,6 +11,8 @@ import {
 } from '../components/AuthSplit'
 import LoadingOverlay from '../components/LoadingOverlay'
 import { supabase } from '../lib/supabase'
+import { generateToken, hashToken, encryptPassword } from '../lib/pendingSignup'
+import { sendVerificationEmail } from '../lib/emailjs'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -19,50 +21,48 @@ export default function SignUp() {
   const [loading, setLoading] = useState(false)
   const [overlay, setOverlay] = useState(null) // null | 'loading' | 'success'
   const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
   const [password, setPassword] = useState('') // drives the strength indicator
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    setInfo('')
     setLoading(true)
 
     const form = new FormData(e.currentTarget)
     const name = form.get('name')?.toString().trim()
     const email = form.get('email')?.toString().trim()
-    const password = form.get('password')?.toString()
+    const rawPassword = form.get('password')?.toString()
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: name }, // saved to your profiles table by the trigger
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-      },
-    })
+    try {
+      setOverlay('loading')
 
-    if (error) {
-      setLoading(false)
-      setError(error.message)
-      return
-    }
+      // 1. Create a one-time token and encrypt the password with it.
+      const token = generateToken()
+      const tokenHash = await hashToken(token)
+      const payload = await encryptPassword(rawPassword, token)
 
-    // Success: loading animation -> confirmation message
-    setOverlay('loading')
-    await sleep(1500)
-    setOverlay('success')
-    await sleep(1500)
+      // 2. Save a *pending* signup. No account exists yet.
+      const { error: pendingError } = await supabase.rpc('create_pending_signup', {
+        p_token_hash: tokenHash,
+        p_email: email,
+        p_full_name: name,
+        p_payload: payload,
+      })
+      if (pendingError) throw pendingError
 
-    // If email confirmation is ON, there is no session yet
-    if (!data.session) {
+      // 3. Email the verification link through EmailJS.
+      await sendVerificationEmail({ name, email, token })
+
+      // 4. Show success, then go to the "check your email" page.
+      setOverlay('success')
+      await sleep(1500)
+      navigate('/check-email', { state: { email, name, token } })
+    } catch (err) {
+      console.error(err)
       setOverlay(null)
       setLoading(false)
-      setInfo('Account created! Please check your email to confirm your account, then sign in.')
-      return
+      setError(err?.text || err?.message || 'Something went wrong. Please try again.')
     }
-
-    navigate('/signin')
   }
 
   return (
@@ -70,8 +70,8 @@ export default function SignUp() {
       {overlay && (
         <LoadingOverlay
           status={overlay}
-          message="Creating your account…"
-          successMessage="Account created successfully!"
+          message="Sending your verification email…"
+          successMessage="Verification email sent!"
         />
       )}
 
@@ -101,12 +101,9 @@ export default function SignUp() {
           {error && (
             <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
           )}
-          {info && (
-            <p role="status" className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{info}</p>
-          )}
 
           <button type="submit" disabled={loading} className={`${primaryBtn} max-w-[300px] justify-self-center disabled:cursor-not-allowed disabled:opacity-60`}>
-            {loading ? 'Creating account…' : 'Create account'}
+            {loading ? 'Sending verification…' : 'Create account'}
           </button>
         </form>
 

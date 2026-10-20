@@ -1,5 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useAuth } from '../lib/AuthContext'
+import { getActivity, newActivityId, saveActivity } from '../lib/activityStore'
 import {
   EMPTY, SAMPLE, TEMPLATES, ResumePreview,
   MARKERS, BULLET_STYLES, blankExperience, blankEducation,
@@ -14,20 +16,42 @@ const STEPS = [
   { id: 'personal', label: 'Personal', title: 'Personal details', hint: 'Start with how employers can reach you.' },
   { id: 'summary', label: 'Summary', title: 'Professional summary', hint: 'Two or three sentences that sell your experience.' },
   { id: 'experience', label: 'Experience', title: 'Work experience', hint: 'List your latest role first and show the results you delivered.' },
+  { id: 'projects', label: 'Projects', title: 'Projects', hint: 'Optional. Show what you have built, especially if you are just starting out.' },
   { id: 'education', label: 'Education', title: 'Education', hint: 'Add your degrees, schools and years.' },
   { id: 'skills', label: 'Skills', title: 'Skills', hint: 'Pick the skills that match the jobs you want.' },
   { id: 'review', label: 'Review', title: 'Review your resume', hint: 'See your score and fix what is still missing.' },
+  { id: 'download', label: 'Download', title: 'Download your resume', hint: 'Choose a format and save your resume.' },
 ]
 const LAST = STEPS.length - 1
+const stepIndex = (id) => STEPS.findIndex((s) => s.id === id)
+
 const ZOOMS = [50, 60, 70, 80, 90, 100, 110, 125, 150, 175, 200]
 const DEFAULT_ZOOM = ZOOMS.indexOf(100)
 const SUGGESTED_SKILLS = ['Communication', 'Teamwork', 'Problem solving', 'Leadership', 'Time management', 'Project management', 'Microsoft Office', 'Customer service']
+const SUGGESTED_TECH = ['JavaScript', 'React', 'Node.js', 'Python', 'SQL', 'Git', 'HTML and CSS', 'REST APIs']
+
+const LINK_TYPES = ['LinkedIn', 'GitHub', 'Portfolio', 'Website', 'Behance', 'Other']
+const MAX_LINKS = 5
+
+const FORMATS = [
+  { id: 'pdf', label: 'PDF', icon: 'file', text: 'Best for applying. Text stays selectable, so ATS can read it. Your print dialog opens: choose "Save as PDF".' },
+  { id: 'docx', label: 'Word (.docx)', icon: 'doc', text: 'Editable in Word or Google Docs. Uses a clean, ATS-safe layout instead of the template design.' },
+  { id: 'png', label: 'Image (PNG)', icon: 'image', text: 'Looks exactly like the preview. Good for sharing, but ATS cannot read images.' },
+]
+
+/* Fields this editor adds on top of EMPTY / SAMPLE. If templateData already defines them, those win. */
+const DEFAULTS = { projects: [], links: [], skillsTitle: 'Skills' }
+const withDefaults = (d) => ({ ...DEFAULTS, ...d })
+const blankProject = () => ({ name: '', tech: '', link: '', period: '', details: '', format: { mode: 'bullets', style: 'disc' } })
+const blankLink = () => ({ type: 'LinkedIn', url: '' })
 
 const INPUT =
   'w-full rounded-lg border border-[#dde8f3] bg-[#f6faff] px-3.5 py-2.5 text-sm text-[#111] transition placeholder:text-[#9aaabd] hover:border-[#c3d6ea] focus:border-[#5b9bd5] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#5b9bd5]/15'
 const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b9bd5]'
 const BTN_PRIMARY = `inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#0b1f3a] px-5 py-2.5 text-sm font-bold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-[#17335c] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 ${FOCUS}`
 const BTN_GHOST = `inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#dde8f3] bg-white px-5 py-2.5 text-sm font-bold text-[#0b1f3a] transition duration-300 hover:border-[#5b9bd5] hover:bg-[#f6faff] disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS}`
+const ADD_BTN = `flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#9cc3e8] py-3 text-sm font-bold text-[#0b1f3a] transition duration-300 hover:border-[#0b1f3a] hover:bg-[#f6faff] ${FOCUS}`
+const CARD = 'grid gap-3 rounded-xl border border-[#dde8f3] border-l-4 border-l-[#5b9bd5] bg-white p-4 shadow-[0_6px_18px_rgba(11,31,58,0.04)]'
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -37,12 +61,23 @@ const words = (s) => (s || '').trim().split(/\s+/).filter(Boolean).length
 const parseSkills = (s) => (s || '').split(',').map((x) => x.trim()).filter(Boolean)
 const frac = (arr, fn) => (arr.length ? arr.filter(fn).length / arr.length : 0)
 const sum = (arr, fn) => arr.reduce((a, x) => a + fn(x), 0)
+const normUrl = (u) => (/^https?:\/\//i.test(u.trim()) ? u.trim() : `https://${u.trim()}`)
+const showUrl = (u) => u.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '')
+const safeName = (s) => (s || '').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'resume'
 
-/* Works out the resume score, a score per section, and what to fix next. */
+/* Works out the resume score, a score per section, and what to fix next.
+   Projects are optional. If there is no work experience but there are projects,
+   the projects count as the experience section. */
 function analyse(d, t) {
   const exp = d.experience
   const edu = d.education
   const skills = parseSkills(d.skills)
+  const proj = (d.projects || []).filter((p) => has(p.name))
+  const links = d.links || []
+
+  const expFilled = exp.some((e) => has(e.role) || has(e.company))
+  const useProj = !expFilled && proj.length > 0
+  const work = useProj ? proj.map((p) => ({ role: p.name, company: p.tech, period: p.period, details: p.details })) : exp
 
   const S = {
     personal: [
@@ -51,14 +86,15 @@ function analyse(d, t) {
       { label: 'Add a valid email address', pts: 6, got: /^\S+@\S+\.\S+$/.test((d.email || '').trim()) ? 1 : 0 },
       { label: 'Add a phone number', pts: 4, got: has(d.phone) ? 1 : 0 },
       { label: 'Add your location', pts: 3, got: has(d.location) ? 1 : 0 },
+      { label: 'Add a LinkedIn or portfolio link', pts: 3, got: links.some((l) => has(l.url)) ? 1 : 0 },
     ],
     summary: [
       { label: words(d.summary) ? 'Expand your summary to 2 or 3 sentences' : 'Write a short professional summary', pts: 15, got: Math.min(1, words(d.summary) / 25) },
     ],
     experience: [
-      { label: 'Add a job title and company', pts: 12, got: frac(exp, (e) => has(e.role) && has(e.company)) },
-      { label: 'Add your employment dates', pts: 5, got: frac(exp, (e) => has(e.period)) },
-      { label: 'Describe what you achieved', pts: 13, got: exp.length ? sum(exp, (e) => Math.min(1, words(e.details) / 20)) / exp.length : 0 },
+      { label: useProj ? 'Add a name to each project' : 'Add a job title and company', pts: 12, got: frac(work, (e) => has(e.role) && (useProj || has(e.company))) },
+      { label: useProj ? 'Add your project dates' : 'Add your employment dates', pts: 5, got: frac(work, (e) => has(e.period)) },
+      { label: useProj ? 'Describe what you built' : 'Describe what you achieved', pts: 13, got: work.length ? sum(work, (e) => Math.min(1, words(e.details) / 20)) / work.length : 0 },
     ],
     education: [
       { label: 'Add your degree and school', pts: 9, got: frac(edu, (e) => has(e.degree) && has(e.school)) },
@@ -69,6 +105,14 @@ function analyse(d, t) {
     ],
   }
   if (t.photo) S.personal.push({ label: 'Upload a profile photo', pts: 5, got: has(d.photo) ? 1 : 0 })
+  if (proj.length > 0 && !useProj) {
+    S.projects = [
+      { label: 'Describe what you built in each project', pts: 6, got: frac(proj, (p) => words(p.details) >= 8) },
+    ]
+  }
+
+  // Which wizard step fixes each section.
+  const stepOf = { experience: useProj ? 'projects' : 'experience' }
 
   const all = Object.values(S).flat()
   const total = sum(all, (i) => i.pts)
@@ -76,6 +120,7 @@ function analyse(d, t) {
 
   const sections = Object.entries(S).map(([id, items]) => ({
     id,
+    step: stepOf[id] || id,
     pct: Math.round((sum(items, (i) => i.pts * i.got) / sum(items, (i) => i.pts)) * 100),
   }))
 
@@ -83,7 +128,7 @@ function analyse(d, t) {
     .flatMap(([id, items]) =>
       items
         .filter((i) => i.got < 1)
-        .map((i) => ({ label: i.label, gain: Math.max(1, Math.round(((1 - i.got) * i.pts / total) * 100)), step: STEPS.findIndex((s) => s.id === id) }))
+        .map((i) => ({ label: i.label, gain: Math.max(1, Math.round(((1 - i.got) * i.pts / total) * 100)), step: stepIndex(stepOf[id] || id) }))
     )
     .sort((a, b) => b.gain - a.gain)
 
@@ -136,6 +181,148 @@ function useCountUp(target) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Export helpers (PDF, Word, PNG)                                     */
+/* ------------------------------------------------------------------ */
+const saveBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/* PNG: needs `npm i html-to-image` */
+async function exportPng(node, name) {
+  const { toPng } = await import('html-to-image')
+  const dataUrl = await toPng(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true })
+  const a = document.createElement('a')
+  a.href = dataUrl
+  a.download = `${name}.png`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+/* PDF: prints the resume from a hidden frame, so the text stays selectable for ATS. */
+async function exportPdf(node, name) {
+  const iframe = document.createElement('iframe')
+  iframe.setAttribute('aria-hidden', 'true')
+  iframe.title = name
+  Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' })
+  document.body.appendChild(iframe)
+
+  const doc = iframe.contentDocument
+  const styles = [...document.querySelectorAll('link[rel="stylesheet"], style')].map((n) => n.outerHTML).join('')
+  doc.open()
+  doc.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${name}</title>${styles}` +
+    `<style>@page{size:A4;margin:0}html,body{margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>` +
+    `</head><body><div style="width:794px">${node.outerHTML}</div></body></html>`
+  )
+  doc.close()
+
+  await new Promise((r) => { iframe.onload = r; setTimeout(r, 700) })
+  await doc.fonts?.ready
+  const win = iframe.contentWindow
+  win.onafterprint = () => iframe.remove()
+  win.focus()
+  win.print()
+  setTimeout(() => iframe.remove(), 120000)
+}
+
+/* Word: builds a clean single-column document from the form data. Needs `npm i docx` */
+async function exportDocx(d, name) {
+  const { Document, Packer, Paragraph, TextRun, ExternalHyperlink, BorderStyle, TabStopType, Tab } = await import('docx')
+  const W = 10080 // text width in twips (A4/Letter with 0.75in margins)
+  const run = (text, o = {}) => new TextRun({ text, ...o })
+  const anchor = (url) => new ExternalHyperlink({ link: normUrl(url), children: [new TextRun({ text: showUrl(url), color: '0563C1', underline: {} })] })
+
+  const heading = (text) =>
+    new Paragraph({
+      spacing: { before: 240, after: 80 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '999999', space: 2 } },
+      children: [run(text, { bold: true, size: 23 })],
+    })
+
+  const lines = (text, format) => {
+    const ls = (text || '').split('\n').map((l) => l.trim()).filter(Boolean)
+    const mode = format?.mode || 'paragraph'
+    if (mode === 'bullets') return ls.map((l) => new Paragraph({ text: l, bullet: { level: 0 }, spacing: { after: 40 } }))
+    if (mode === 'numbered') return ls.map((l, i) => new Paragraph({ children: [run(`${i + 1}. ${l}`)], indent: { left: 360 }, spacing: { after: 40 } }))
+    return ls.length ? [new Paragraph({ text: ls.join(' '), spacing: { after: 60 } })] : []
+  }
+
+  const row = (left, right) =>
+    new Paragraph({
+      tabStops: [{ type: TabStopType.RIGHT, position: W }],
+      spacing: { before: 100 },
+      children: [...left, ...(right ? [new TextRun({ children: [new Tab(), right] })] : [])],
+    })
+
+  const out = []
+  out.push(new Paragraph({ children: [run(d.name || '', { bold: true, size: 40 })] }))
+  if (has(d.title)) out.push(new Paragraph({ children: [run(d.title, { size: 24, color: '444444' })] }))
+
+  const contact = [d.email, d.phone, d.location].filter(has).join('  |  ')
+  if (contact) out.push(new Paragraph({ spacing: { before: 60 }, children: [run(contact)] }))
+
+  const links = (d.links || []).filter((l) => has(l.url))
+  if (links.length) {
+    const kids = []
+    links.forEach((l, i) => {
+      if (i) kids.push(run('  |  '))
+      kids.push(anchor(l.url))
+    })
+    out.push(new Paragraph({ children: kids }))
+  }
+
+  if (has(d.summary)) {
+    out.push(heading('Summary'), ...lines(d.summary, d.summaryFormat))
+  }
+
+  const exp = d.experience.filter((e) => has(e.role) || has(e.company))
+  if (exp.length) {
+    out.push(heading('Experience'))
+    exp.forEach((e) => {
+      out.push(row([run(e.role || '', { bold: true }), ...(has(e.company) ? [run(`, ${e.company}`)] : [])], e.period))
+      out.push(...lines(e.details, e.format))
+    })
+  }
+
+  const proj = (d.projects || []).filter((p) => has(p.name))
+  if (proj.length) {
+    out.push(heading('Projects'))
+    proj.forEach((p) => {
+      out.push(row([run(p.name, { bold: true }), ...(has(p.tech) ? [run(`  |  ${p.tech}`)] : [])], p.period))
+      if (has(p.link)) out.push(new Paragraph({ children: [anchor(p.link)] }))
+      out.push(...lines(p.details, p.format))
+    })
+  }
+
+  const edu = d.education.filter((e) => has(e.degree) || has(e.school))
+  if (edu.length) {
+    out.push(heading('Education'))
+    edu.forEach((e) => {
+      out.push(row([run(e.degree || '', { bold: true }), ...(has(e.school) ? [run(`, ${e.school}`)] : [])], e.period))
+    })
+  }
+
+  const skills = parseSkills(d.skills)
+  if (skills.length) {
+    out.push(heading(d.skillsTitle || 'Skills'), new Paragraph({ children: [run(skills.join(', '))] }))
+  }
+
+  const doc = new Document({
+    styles: { default: { document: { run: { font: 'Calibri', size: 21 } } } },
+    sections: [{ properties: { page: { margin: { top: 1080, bottom: 1080, left: 1080, right: 1080 } } }, children: out }],
+  })
+  saveBlob(await Packer.toBlob(doc), `${name}.docx`)
+}
+
+/* ------------------------------------------------------------------ */
 /* Icons                                                               */
 /* ------------------------------------------------------------------ */
 const Icon = ({ children, className = 'h-4 w-4', ...rest }) => (
@@ -148,11 +335,17 @@ const PlusIcon = (p) => <Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>
 const MinusIcon = (p) => <Icon {...p}><path d="M5 12h14" /></Icon>
 const TrashIcon = (p) => <Icon {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3" /></Icon>
 const UploadIcon = (p) => <Icon {...p}><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></Icon>
+const DownloadIcon = (p) => <Icon {...p}><path d="M12 4v12M7 11l5 5 5-5M5 20h14" /></Icon>
 const CameraIcon = (p) => <Icon {...p}><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></Icon>
 const PenIcon = (p) => <Icon {...p}><path d="M4 20l4-1 11-11-3-3L5 16l-1 4zM14 6l3 3" /></Icon>
 const ChevronLeft = (p) => <Icon {...p}><path d="M15 5l-7 7 7 7" /></Icon>
 const ChevronRight = (p) => <Icon {...p}><path d="M9 5l7 7-7 7" /></Icon>
 const CloseIcon = (p) => <Icon {...p}><path d="M6 6l12 12M18 6L6 18" /></Icon>
+const FileIcon = (p) => <Icon {...p}><path d="M7 3h7l5 5v13H7zM14 3v5h5" /></Icon>
+const DocIcon = (p) => <Icon {...p}><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6" /></Icon>
+const ImageIcon = (p) => <Icon {...p}><rect x="4" y="5" width="16" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Icon>
+const FolderPlusIcon = (p) => <Icon {...p}><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><path d="M12 11v5M9.5 13.5h5" /></Icon>
+const FORMAT_ICON = { file: FileIcon, doc: DocIcon, image: ImageIcon }
 
 /* ------------------------------------------------------------------ */
 /* Small UI pieces                                                     */
@@ -238,6 +431,47 @@ function RichField({ label, value, format, onChange, placeholder, rows = 4 }) {
         placeholder={isList ? 'One point per line. Press Enter for a new one.' : placeholder}
         className={`${INPUT} resize-y leading-relaxed`}
       />
+    </div>
+  )
+}
+
+/* Contact links such as LinkedIn, GitHub or a portfolio. */
+function LinksEditor({ links, onChange }) {
+  const update = (i, patch) => onChange(links.map((l, idx) => (idx === i ? { ...l, ...patch } : l)))
+  return (
+    <div className="grid gap-2.5">
+      <div>
+        <p className="text-xs font-bold text-[#0b1f3a]">Links</p>
+        <p className="mt-0.5 text-xs text-[#4a5a70]">LinkedIn, GitHub, portfolio or any page you want employers to see.</p>
+      </div>
+      {links.map((l, i) => (
+        <div key={i} className="ed-rise grid grid-cols-[112px_1fr_auto] items-center gap-2">
+          <select
+            aria-label={`Link ${i + 1} type`}
+            value={l.type}
+            onChange={(e) => update(i, { type: e.target.value })}
+            className={`${INPUT} cursor-pointer`}
+          >
+            {LINK_TYPES.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <input
+            aria-label={`Link ${i + 1} address`}
+            type="url"
+            value={l.url}
+            onChange={(e) => update(i, { url: e.target.value })}
+            placeholder="linkedin.com/in/yourname"
+            className={INPUT}
+          />
+          <button type="button" onClick={() => onChange(links.filter((_, idx) => idx !== i))} aria-label={`Remove link ${i + 1}`} className={`grid h-9 w-9 cursor-pointer place-items-center rounded-md text-[#7a2e3a] transition hover:bg-[#f8eeef] ${FOCUS}`}>
+            <TrashIcon />
+          </button>
+        </div>
+      ))}
+      {links.length < MAX_LINKS && (
+        <button type="button" onClick={() => onChange([...links, blankLink()])} className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded text-xs font-bold text-[#2f6fa8] hover:underline ${FOCUS}`}>
+          <PlusIcon className="h-3.5 w-3.5" /> Add a link
+        </button>
+      )}
     </div>
   )
 }
@@ -328,12 +562,12 @@ function ScoreCard({ analysis, onJump }) {
 
 function Stepper({ step, done, onGo }) {
   return (
-    <ol aria-label="Resume steps" className="flex shrink-0 items-start px-5 pb-1 pt-5">
+    <ol aria-label="Resume steps" className="flex shrink-0 items-start px-4 pb-1 pt-5">
       {STEPS.map((s, i) => {
         const active = i === step
         const complete = done[i] && !active
         return (
-          <li key={s.id} className="relative flex-1">
+          <li key={s.id} className="relative min-w-0 flex-1">
             {i < LAST && (
               <span aria-hidden="true" className="absolute left-1/2 top-4 h-0.5 w-full -translate-y-1/2 bg-[#dde8f3]">
                 <span className="block h-full bg-[#0b1f3a] transition-[width] duration-500 ease-out" style={{ width: i < step ? '100%' : '0%' }} />
@@ -356,7 +590,7 @@ function Stepper({ step, done, onGo }) {
               >
                 {complete ? <CheckIcon className="h-4 w-4" /> : i + 1}
               </span>
-              <span className={`hidden text-[11px] font-bold sm:block ${active ? 'text-[#0b1f3a]' : 'text-[#4a5a70]'}`}>{s.label}</span>
+              <span className={`hidden whitespace-nowrap text-[10px] font-bold sm:block ${active ? 'text-[#0b1f3a]' : 'text-[#4a5a70]'}`}>{s.label}</span>
             </button>
           </li>
         )
@@ -372,26 +606,48 @@ export default function ResumeEditing() {
   const { templateId } = useParams()
   const t = TEMPLATES.find((x) => x.id === templateId) || TEMPLATES[0]
 
-  const [data, setData] = useState(EMPTY)
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const userId = user?.id || 'guest'
+  const [params] = useSearchParams()
+  // Opened from My Activities: load the saved resume instead of starting fresh.
+  const [saved] = useState(() => (params.get('activity') ? getActivity(userId, params.get('activity')) : null))
+  const [activityId, setActivityId] = useState(saved?.id || null)
+  const [saveErr, setSaveErr] = useState('')
+
+  const [data, setData] = useState(() => withDefaults(saved ? saved.data : EMPTY))
   const [step, setStep] = useState(0)
   const [dir, setDir] = useState(1)
   const [zi, setZi] = useState(DEFAULT_ZOOM)
-  const [modal, setModal] = useState(true)
-  const [started, setStarted] = useState(false)
+  const [modal, setModal] = useState(!saved)
+  const [started, setStarted] = useState(!!saved)
   const [scan, setScan] = useState('idle') // idle | scanning
   const [scanStep, setScanStep] = useState(0)
   const [fileName, setFileName] = useState('')
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState(saved ? 'Your saved resume is loaded. Make changes, then update it in My Activities.' : '')
   const [tab, setTab] = useState('edit') // mobile only
+  const [fmt, setFmt] = useState('pdf')
+  const [outName, setOutName] = useState(saved?.title || '')
+  const [busy, setBusy] = useState(false)
+  const [dlMsg, setDlMsg] = useState(null)
+  const [downloaded, setDownloaded] = useState(false)
   const timers = useRef([])
   const bodyRef = useRef(null)
+  const exportRef = useRef(null)
 
   const analysis = useMemo(() => analyse(data, t), [data, t])
   const done = useMemo(
-    () => [...analysis.sections.map((s) => s.pct >= 75), analysis.score >= 80],
-    [analysis]
+    () =>
+      STEPS.map((s) => {
+        if (s.id === 'review') return analysis.score >= 80
+        if (s.id === 'download') return downloaded
+        const sec = analysis.sections.find((x) => x.step === s.id)
+        return sec ? sec.pct >= 75 : false
+      }),
+    [analysis, downloaded]
   )
   const zoom = ZOOMS[zi]
+  const expFilled = data.experience.some((e) => has(e.role) || has(e.company))
 
   useEffect(() => () => timers.current.forEach(clearTimeout), [])
   useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }) }, [step])
@@ -407,14 +663,16 @@ export default function ResumeEditing() {
   const setField = (k) => (e) => setData((d) => ({ ...d, [k]: e.target.value }))
   const setItem = (key, i, field) => (e) =>
     setData((d) => ({ ...d, [key]: d[key].map((it, idx) => (idx === i ? { ...it, [field]: e.target.value } : it)) }))
-  const setExpRich = (i) => ({ text, format }) =>
-    setData((d) => ({ ...d, experience: d.experience.map((it, idx) => (idx === i ? { ...it, details: text, format } : it)) }))
-  const addItem = (key, blank) => setData((d) => ({ ...d, [key]: [...d[key], blank] }))
+  const setRich = (key, i) => ({ text, format }) =>
+    setData((d) => ({ ...d, [key]: d[key].map((it, idx) => (idx === i ? { ...it, details: text, format } : it)) }))
+  const addItem = (key, blank) => setData((d) => ({ ...d, [key]: [...(d[key] || []), blank] }))
   const removeItem = (key, i) => setData((d) => ({ ...d, [key]: d[key].filter((_, idx) => idx !== i) }))
 
   const skills = parseSkills(data.skills)
   const setSkills = (list) => setData((d) => ({ ...d, skills: list.join(', ') }))
-  const suggestions = SUGGESTED_SKILLS.filter((s) => !skills.some((x) => x.toLowerCase() === s.toLowerCase())).slice(0, 6)
+  const techMode = data.skillsTitle === 'Technical Skills'
+  const pool = techMode ? SUGGESTED_TECH : SUGGESTED_SKILLS
+  const suggestions = pool.filter((s) => !skills.some((x) => x.toLowerCase() === s.toLowerCase())).slice(0, 6)
 
   /* Placeholder scan: shows progress, then fills the form with sample data.
      TODO: send the file to your backend or an AI service and use the parsed details instead of SAMPLE. */
@@ -428,7 +686,7 @@ export default function ResumeEditing() {
       setTimeout(() => setScanStep(1), 800),
       setTimeout(() => setScanStep(2), 1600),
       setTimeout(() => {
-        setData(SAMPLE)
+        setData(withDefaults(SAMPLE))
         setNotice(`We filled the form from ${file.name}. Check each field before you finish.`)
         setScan('idle')
         setModal(false)
@@ -440,11 +698,46 @@ export default function ResumeEditing() {
   }
 
   const startBlank = () => {
-    setData(EMPTY)
+    setData(withDefaults(EMPTY))
     setNotice('')
     setStarted(true)
     setStep(0)
     setModal(false)
+  }
+
+  /* ---------------- Download ---------------- */
+  const defaultName = `${(data.name || 'My').trim().replace(/\s+/g, '-')}-Resume`
+
+  const handleDownload = async () => {
+    setBusy(true)
+    setDlMsg(null)
+    try {
+      const name = safeName(outName.trim() || defaultName)
+      if (fmt === 'png') await exportPng(exportRef.current, name)
+      else if (fmt === 'docx') await exportDocx(data, name)
+      else await exportPdf(exportRef.current, name)
+      setDownloaded(true)
+      setDlMsg({
+        ok: true,
+        text: fmt === 'pdf' ? 'Your print dialog is open. Choose "Save as PDF" as the destination.' : `Saved ${name}.${fmt}.`,
+      })
+    } catch (err) {
+      console.error(err)
+      setDlMsg({ ok: false, text: 'We could not create that file. Try again or choose another format.' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /* Saves the resume in this browser under My Activities, then opens that page. */
+  const handleAddToActivities = () => {
+    const id = activityId || newActivityId()
+    const title = outName.trim() || defaultName.replace(/-/g, ' ')
+    const res = saveActivity(userId, { id, title, templateId: t.id, data, score: analysis.score })
+    if (!res.ok) { setSaveErr(res.error); return }
+    setSaveErr('')
+    setActivityId(id)
+    navigate('/dashboard/resumes', { state: { added: title, updated: !!activityId } })
   }
 
   /* ---------------- Step content ---------------- */
@@ -461,6 +754,7 @@ export default function ResumeEditing() {
               <Field label="Phone" type="tel" value={data.phone} onChange={setField('phone')} placeholder="+63 900 000 0000" autoComplete="tel" />
               <Field label="Location" value={data.location} onChange={setField('location')} placeholder="Quezon City" className="col-span-2" />
             </div>
+            <LinksEditor links={data.links} onChange={(links) => setData((d) => ({ ...d, links }))} />
           </>
         )
 
@@ -479,8 +773,18 @@ export default function ResumeEditing() {
       case 'experience':
         return (
           <>
+            {!expFilled && (
+              <div className="flex items-start gap-3 rounded-xl bg-[#eef5fb] p-4 text-sm text-[#0b1f3a]">
+                <p className="flex-1">
+                  No work experience yet? Skip this step and add your projects instead. They count as your experience.
+                </p>
+                <button type="button" onClick={() => go(stepIndex('projects'))} className={`shrink-0 cursor-pointer rounded text-sm font-bold text-[#2f6fa8] hover:underline ${FOCUS}`}>
+                  Add projects
+                </button>
+              </div>
+            )}
             {data.experience.map((e, i) => (
-              <div key={i} className="grid gap-3 rounded-xl border border-[#dde8f3] border-l-4 border-l-[#5b9bd5] bg-white p-4 shadow-[0_6px_18px_rgba(11,31,58,0.04)]">
+              <div key={i} className={CARD}>
                 <div className="flex items-center justify-between">
                   <p className={`${DISPLAY} text-sm font-medium text-[#0b1f3a]`}>Position {i + 1}</p>
                   {data.experience.length > 1 && (
@@ -494,11 +798,45 @@ export default function ResumeEditing() {
                   <Field label="Company" value={e.company} onChange={setItem('experience', i, 'company')} placeholder="Northwind Co." />
                   <Field label="Dates" value={e.period} onChange={setItem('experience', i, 'period')} placeholder="2021 to now" className="col-span-2" />
                 </div>
-                <RichField label="Achievements" value={e.details} format={e.format} onChange={setExpRich(i)} placeholder="Describe what you achieved and the results." />
+                <RichField label="Achievements" value={e.details} format={e.format} onChange={setRich('experience', i)} placeholder="Describe what you achieved and the results." />
               </div>
             ))}
-            <button type="button" onClick={() => addItem('experience', blankExperience())} className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#9cc3e8] py-3 text-sm font-bold text-[#0b1f3a] transition duration-300 hover:border-[#0b1f3a] hover:bg-[#f6faff] ${FOCUS}`}>
+            <button type="button" onClick={() => addItem('experience', blankExperience())} className={ADD_BTN}>
               <PlusIcon /> Add another position
+            </button>
+          </>
+        )
+
+      case 'projects':
+        return (
+          <>
+            {data.projects.length === 0 && (
+              <div className="rounded-xl border border-dashed border-[#9cc3e8] bg-[#f6faff] p-5 text-sm text-[#4a5a70]">
+                <p className={`${DISPLAY} text-base font-medium text-[#0b1f3a]`}>This step is optional</p>
+                <p className="mt-1">
+                  Add school, personal or capstone projects. If you have no work experience yet, projects count as your experience.
+                </p>
+              </div>
+            )}
+            {data.projects.map((p, i) => (
+              <div key={i} className={`${CARD} ed-rise`}>
+                <div className="flex items-center justify-between">
+                  <p className={`${DISPLAY} text-sm font-medium text-[#0b1f3a]`}>Project {i + 1}</p>
+                  <button type="button" onClick={() => removeItem('projects', i)} aria-label={`Remove project ${i + 1}`} className={`grid h-8 w-8 cursor-pointer place-items-center rounded-md text-[#7a2e3a] transition hover:bg-[#f8eeef] ${FOCUS}`}>
+                    <TrashIcon />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Project name" value={p.name} onChange={setItem('projects', i, 'name')} placeholder="Online Store App" className="col-span-2" />
+                  <Field label="Tools used" value={p.tech} onChange={setItem('projects', i, 'tech')} placeholder="React, Node.js, PostgreSQL" className="col-span-2" />
+                  <Field label="Link (optional)" value={p.link} onChange={setItem('projects', i, 'link')} placeholder="github.com/you/project" />
+                  <Field label="Dates (optional)" value={p.period} onChange={setItem('projects', i, 'period')} placeholder="2025" />
+                </div>
+                <RichField label="What you built" value={p.details} format={p.format} onChange={setRich('projects', i)} placeholder="Describe what the project does and the result." />
+              </div>
+            ))}
+            <button type="button" onClick={() => addItem('projects', blankProject())} className={ADD_BTN}>
+              <PlusIcon /> {data.projects.length ? 'Add another project' : 'Add a project'}
             </button>
           </>
         )
@@ -507,7 +845,7 @@ export default function ResumeEditing() {
         return (
           <>
             {data.education.map((e, i) => (
-              <div key={i} className="grid gap-3 rounded-xl border border-[#dde8f3] border-l-4 border-l-[#5b9bd5] bg-white p-4 shadow-[0_6px_18px_rgba(11,31,58,0.04)]">
+              <div key={i} className={CARD}>
                 <div className="flex items-center justify-between">
                   <p className={`${DISPLAY} text-sm font-medium text-[#0b1f3a]`}>School {i + 1}</p>
                   {data.education.length > 1 && (
@@ -523,7 +861,7 @@ export default function ResumeEditing() {
                 </div>
               </div>
             ))}
-            <button type="button" onClick={() => addItem('education', blankEducation())} className={`flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#9cc3e8] py-3 text-sm font-bold text-[#0b1f3a] transition duration-300 hover:border-[#0b1f3a] hover:bg-[#f6faff] ${FOCUS}`}>
+            <button type="button" onClick={() => addItem('education', blankEducation())} className={ADD_BTN}>
               <PlusIcon /> Add another school
             </button>
           </>
@@ -532,7 +870,27 @@ export default function ResumeEditing() {
       case 'skills':
         return (
           <>
-            <Field label="Skills, separated by commas" value={data.skills} onChange={setField('skills')} placeholder="Strategy, Analytics, SEO" />
+            <div>
+              <p className="mb-1.5 text-xs font-bold text-[#0b1f3a]">Section heading on your resume</p>
+              <div role="group" aria-label="Skills section heading" className="inline-flex rounded-lg bg-[#eef5fb] p-0.5">
+                {['Skills', 'Technical Skills'].map((title) => (
+                  <button
+                    key={title}
+                    type="button"
+                    aria-pressed={(data.skillsTitle || 'Skills') === title}
+                    onClick={() => setData((d) => ({ ...d, skillsTitle: title }))}
+                    className={`cursor-pointer rounded-md px-3.5 py-1.5 text-xs font-bold transition duration-200 ${FOCUS} ${
+                      (data.skillsTitle || 'Skills') === title ? 'bg-white text-[#0b1f3a] shadow-sm' : 'text-[#4a5a70] hover:text-[#0b1f3a]'
+                    }`}
+                  >
+                    {title}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-[#4a5a70]">Choose Technical Skills if you apply for developer or IT roles.</p>
+            </div>
+
+            <Field label={`${techMode ? 'Technical skills' : 'Skills'}, separated by commas`} value={data.skills} onChange={setField('skills')} placeholder={techMode ? 'JavaScript, React, SQL' : 'Strategy, Analytics, SEO'} />
             {skills.length > 0 && (
               <div className="flex flex-wrap gap-2" aria-label="Your skills">
                 {skills.map((s, i) => (
@@ -560,7 +918,7 @@ export default function ResumeEditing() {
           </>
         )
 
-      default:
+      case 'review':
         return (
           <>
             <div className="flex items-center gap-5 rounded-xl border border-[#dde8f3] bg-[#f6faff] p-5">
@@ -576,20 +934,23 @@ export default function ResumeEditing() {
             </div>
 
             <div className="grid gap-3.5">
-              {analysis.sections.map((s, i) => (
-                <div key={s.id}>
-                  <div className="mb-1.5 flex items-center justify-between text-sm">
-                    <span className="font-bold text-[#0b1f3a]">{STEPS[i].label}</span>
-                    <span className="flex items-center gap-3">
-                      <span className="text-[#4a5a70]">{s.pct}%</span>
-                      <button type="button" onClick={() => go(i)} className={`cursor-pointer rounded text-xs font-bold text-[#2f6fa8] hover:underline ${FOCUS}`}>Edit</button>
-                    </span>
+              {analysis.sections.map((s) => {
+                const target = stepIndex(s.step)
+                return (
+                  <div key={s.id}>
+                    <div className="mb-1.5 flex items-center justify-between text-sm">
+                      <span className="font-bold text-[#0b1f3a]">{STEPS[target].label}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="text-[#4a5a70]">{s.pct}%</span>
+                        <button type="button" onClick={() => go(target)} className={`cursor-pointer rounded text-xs font-bold text-[#2f6fa8] hover:underline ${FOCUS}`}>Edit</button>
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-[#dcebfa]">
+                      <div className="ed-grow h-full origin-left rounded-full transition-[width] duration-700 ease-out" style={{ width: `${s.pct}%`, background: scoreColor(s.pct) }} />
+                    </div>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-[#dcebfa]">
-                    <div className="ed-grow h-full origin-left rounded-full transition-[width] duration-700 ease-out" style={{ width: `${s.pct}%`, background: scoreColor(s.pct) }} />
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {analysis.tips.length > 0 && (
@@ -607,6 +968,73 @@ export default function ResumeEditing() {
                 </ul>
               </div>
             )}
+          </>
+        )
+
+      default:
+        return (
+          <>
+            {analysis.score < 60 && (
+              <div className="flex items-start gap-3 rounded-xl bg-[#fff6e6] p-4 text-sm text-[#5c3d00]">
+                <p className="flex-1">Your score is {analysis.score}%. You can download now, or fix a few items first.</p>
+                <button type="button" onClick={() => go(stepIndex('review'))} className={`shrink-0 cursor-pointer rounded font-bold underline ${FOCUS}`}>Review</button>
+              </div>
+            )}
+
+            <div role="radiogroup" aria-label="File format" className="grid gap-3">
+              {FORMATS.map((f) => {
+                const FIcon = FORMAT_ICON[f.icon]
+                const on = fmt === f.id
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => { setFmt(f.id); setDlMsg(null) }}
+                    className={`flex cursor-pointer items-start gap-4 rounded-xl border p-4 text-left transition duration-300 ${FOCUS} ${
+                      on ? 'border-[#0b1f3a] bg-[#f6faff] shadow-[0_8px_22px_rgba(11,31,58,0.08)]' : 'border-[#dde8f3] bg-white hover:-translate-y-0.5 hover:border-[#5b9bd5]'
+                    }`}
+                  >
+                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg transition duration-300 ${on ? 'bg-[#0b1f3a] text-white' : 'bg-[#eef5fb] text-[#0b1f3a]'}`}>
+                      <FIcon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`${DISPLAY} block text-base font-medium text-[#0b1f3a]`}>{f.label}</span>
+                      <span className="mt-0.5 block text-sm leading-relaxed text-[#4a5a70]">{f.text}</span>
+                    </span>
+                    <span className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition duration-300 ${on ? 'border-[#0b1f3a] bg-[#0b1f3a] text-white' : 'border-[#cfdceb]'}`}>
+                      {on && <CheckIcon className="h-3 w-3" />}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <Field label="File name" value={outName} onChange={(e) => setOutName(e.target.value)} placeholder={defaultName} />
+
+            <button type="button" onClick={handleDownload} disabled={busy} className={`${BTN_PRIMARY} w-full !py-3`}>
+              <DownloadIcon /> {busy ? 'Preparing your file' : `Download ${FORMATS.find((f) => f.id === fmt).label}`}
+            </button>
+
+            {dlMsg && (
+              <p
+                role={dlMsg.ok ? 'status' : 'alert'}
+                className={`ed-rise rounded-lg p-3 text-sm ${dlMsg.ok ? 'bg-[#eaf8f1] text-[#0f6b40]' : 'bg-[#f8eeef] text-[#7a2e3a]'}`}
+              >
+                {dlMsg.text}
+              </p>
+            )}
+
+            <div className="mt-1 border-t border-[#dde8f3] pt-5">
+              <p className="text-sm text-[#4a5a70]">
+                {activityId ? 'Save your latest changes to the copy in My Activities.' : 'Keep this resume in My Activities so you can open and edit it later.'}
+              </p>
+              <button type="button" onClick={handleAddToActivities} className={`${BTN_GHOST} mt-3 w-full !py-3`}>
+                <FolderPlusIcon /> {activityId ? 'Update in My Activities' : 'Add to My Activities'}
+              </button>
+              {saveErr && <p role="alert" className="mt-2 rounded-lg bg-[#f8eeef] p-3 text-sm text-[#7a2e3a]">{saveErr}</p>}
+            </div>
           </>
         )
     }
@@ -678,7 +1106,7 @@ export default function ResumeEditing() {
 
       <div className="flex min-h-0 flex-1">
         {/* LEFT: guided form */}
-        <aside className={`${tab === 'edit' ? 'flex' : 'hidden'} ed-in-l min-h-0 w-full flex-col bg-white md:flex md:w-[460px] md:shrink-0 md:border-r md:border-[#dde8f3]`}>
+        <aside className={`${tab === 'edit' ? 'flex' : 'hidden'} ed-in-l min-h-0 w-full flex-col bg-white md:flex md:w-[500px] md:shrink-0 md:border-r md:border-[#dde8f3]`}>
           <ScoreCard analysis={analysis} onJump={go} />
           <Stepper step={step} done={done} onGo={go} />
 
@@ -705,7 +1133,7 @@ export default function ResumeEditing() {
             </button>
             {step < LAST ? (
               <button type="button" onClick={() => go(step + 1)} className={BTN_PRIMARY}>
-                Next: {STEPS[step + 1].label} <ChevronRight />
+                {STEPS[step + 1].id === 'projects' ? 'Next: Projects (optional)' : `Next: ${STEPS[step + 1].label}`} <ChevronRight />
               </button>
             ) : (
               <button type="button" onClick={() => setTab('preview')} className={`${BTN_PRIMARY} md:hidden`}>View resume</button>
@@ -736,6 +1164,15 @@ export default function ResumeEditing() {
           </div>
         </main>
       </div>
+
+      {/* Full-size copy of the resume used for PDF and PNG export. Only mounted on the download step. */}
+      {step === LAST && (
+        <div aria-hidden="true" className="pointer-events-none fixed -left-[10000px] top-0">
+          <div ref={exportRef} style={{ width: 794, background: '#fff' }}>
+            <ResumePreview t={t} data={data} />
+          </div>
+        </div>
+      )}
 
       {/* START / IMPORT MODAL */}
       {modal && (

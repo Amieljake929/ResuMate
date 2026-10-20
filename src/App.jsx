@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import ResuMate from './website/ResuMate'
 import SignIn from './signin/SignIn'
 import SignUp from './signup/SignUp'
+import CheckEmail from './signup/CheckEmail'
+import EmailVerified from './signup/EmailVerified'
 import ResumeTemplates from './editing/ResumeTemplates'
 import ResumeEditing from './editing/ResumeEditing'
 import ProtectedRoute from './lib/ProtectedRoute'
@@ -17,6 +19,7 @@ const DashboardLayout = lazy(() => import('./dashboard/DashboardLayout'))
 const DashboardHome = lazy(() => import('./dashboard/DashboardHome'))
 const DashboardTemplates = lazy(() => import('./dashboard/DashboardTemplates'))
 const DashboardResumeEditing = lazy(() => import('./dashboard/ResumeEditing'))
+const MyActivities = lazy(() => import('./dashboard/MyActivities'))
 
 // Simple 404 page
 const NotFound = () => (
@@ -34,10 +37,12 @@ function App() {
         <Routes>
           <Route path="/" element={<ResuMate />} />
 
-          {/* Sign in / Sign up share one layout, so the left side never reloads when switching */}
+          {/* Sign in / Sign up / email verification share one layout, so the left side never reloads when switching */}
           <Route element={<AuthLayout />}>
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/check-email" element={<CheckEmail />} />
+            <Route path="/verify" element={<EmailVerified />} />
           </Route>
 
           <Route path="/templates" element={<ProtectedRoute><ResumeTemplates /></ProtectedRoute>} />
@@ -57,7 +62,7 @@ function App() {
             <Route path="templates" element={<DashboardTemplates />} />
             <Route path="editor" element={<DashboardResumeEditing />} />
             <Route path="editor/:templateId" element={<DashboardResumeEditing />} />
-            <Route path="resumes" element={<Placeholder title="My Resumes" description="Your saved resumes will appear here." />} />
+            <Route path="resumes" element={<MyActivities />} />
             <Route path="settings" element={<Placeholder title="Settings" />} />
           </Route>
 

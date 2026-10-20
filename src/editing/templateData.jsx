@@ -12,13 +12,18 @@ export const BULLET_STYLES = [
 /* ---------- Blank / sample data ---------- */
 export const blankExperience = () => ({ role: '', company: '', period: '', details: '', format: { mode: 'bullets', style: 'disc' } })
 export const blankEducation = () => ({ school: '', degree: '', period: '' })
+export const blankProject = () => ({ name: '', tech: '', link: '', period: '', details: '', format: { mode: 'bullets', style: 'disc' } })
+export const blankLink = () => ({ type: 'LinkedIn', url: '' })
 
 export const EMPTY = {
   name: '', title: '', email: '', phone: '', location: '', photo: '', summary: '',
   summaryFormat: { mode: 'paragraph', style: 'disc' },
+  links: [],
   experience: [blankExperience()],
+  projects: [],
   education: [blankEducation()],
   skills: '',
+  skillsTitle: 'Skills',
 }
 
 export const SAMPLE = {
@@ -26,13 +31,16 @@ export const SAMPLE = {
   phone: '+63 912 345 6789', location: 'Quezon City', photo: '',
   summary: 'Marketing manager with 8 years of experience leading campaigns that grow revenue and brand reach.',
   summaryFormat: { mode: 'paragraph', style: 'disc' },
+  links: [{ type: 'LinkedIn', url: 'linkedin.com/in/ameliareyes' }],
   experience: [{
     role: 'Senior Marketing Manager', company: 'Northwind Co.', period: '2021 to now',
     details: 'Led a team of six and raised qualified leads by 42%.\nLaunched three campaigns that doubled social engagement.',
     format: { mode: 'bullets', style: 'disc' },
   }],
+  projects: [],
   education: [{ school: 'University of the Philippines', degree: 'BS Business Administration', period: '2014 to 2018' }],
   skills: 'Strategy, Analytics, SEO, Copywriting',
+  skillsTitle: 'Skills',
 }
 
 const T = (id, name, layout, font, ink, accent, tint, tags, photo = false) => ({ id, name, layout, font, ink, accent, tint, tags, photo })
@@ -52,6 +60,9 @@ export const TEMPLATES = [
 ]
 
 const ph = (v, p) => (v && v.trim() ? v : p)
+const has = (v) => !!(v && String(v).trim())
+const normUrl = (u) => (/^https?:\/\//i.test(u.trim()) ? u.trim() : `https://${u.trim()}`)
+const showUrl = (u) => u.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '')
 const BODY = { lineHeight: 1.5, color: '#44546a' }
 
 function Sec({ t, title, children }) {
@@ -60,6 +71,17 @@ function Sec({ t, title, children }) {
       <p style={{ color: t.accent, fontWeight: 600, borderBottom: `1px solid ${t.layout === 'docs' ? '#dadce0' : t.tint}`, paddingBottom: '0.15em', marginBottom: '0.35em' }}>{title}</p>
       {children}
     </div>
+  )
+}
+
+/* A clickable link in the full preview and exports. In thumbnails it is plain text,
+   because thumbnails already sit inside a link. */
+function Anchor({ url, plain }) {
+  if (plain) return <span>{showUrl(url)}</span>
+  return (
+    <a href={normUrl(url)} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+      {showUrl(url)}
+    </a>
   )
 }
 
@@ -91,7 +113,12 @@ export function ResumePreview({ t, data: d, thumb = false }) {
   const two = t.layout === 'two'
   const contact = [d.email, d.phone, d.location].filter(Boolean).join('  |  ') || 'email@example.com | +00 000 000 000'
   const initials = (d.name || 'Your Name').split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-  const skills = d.skills.split(',').map((x) => x.trim()).filter(Boolean)
+  const skills = (d.skills || '').split(',').map((x) => x.trim()).filter(Boolean)
+  const links = (d.links || []).filter((l) => has(l.url))
+  const projects = (d.projects || []).filter((p) => has(p.name))
+  const expFilled = d.experience.some((e) => has(e.role) || has(e.company))
+  // With no work experience but some projects, the projects stand in for experience.
+  const showExp = expFilled || projects.length === 0
 
   const avatar = d.photo ? (
     <img
@@ -109,6 +136,16 @@ export function ResumePreview({ t, data: d, thumb = false }) {
       <p style={{ fontSize: '2.3em', lineHeight: 1.1, fontWeight: 600, color: banner ? '#fff' : t.ink }}>{ph(d.name, 'Your Name')}</p>
       <p style={{ color: banner ? 'rgba(255,255,255,0.85)' : t.accent, marginTop: '0.2em' }}>{ph(d.title, 'Job title')}</p>
       {!two && <p style={{ fontSize: '0.8em', marginTop: '0.3em', color: banner ? 'rgba(255,255,255,0.75)' : '#5b6b80' }}>{contact}</p>}
+      {!two && links.length > 0 && (
+        <p style={{ fontSize: '0.8em', marginTop: '0.15em', color: banner ? 'rgba(255,255,255,0.75)' : '#5b6b80' }}>
+          {links.map((l, i) => (
+            <span key={i}>
+              {i > 0 && '  |  '}
+              <Anchor url={l.url} plain={thumb} />
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   )
   const summary = (
@@ -116,13 +153,30 @@ export function ResumePreview({ t, data: d, thumb = false }) {
       <RichText t={t} text={d.summary} format={d.summaryFormat} fallback="Your short professional summary appears here." />
     </Sec>
   )
-  const exp = (
+  const exp = showExp && (
     <Sec t={t} title="Experience">
       {d.experience.map((e, i) => (
         <div key={i} style={{ marginBottom: '0.6em' }}>
           <p style={{ ...BODY, color: t.ink, fontWeight: 600 }}>{ph(e.role, 'Job title')}{e.company ? `, ${e.company}` : ''}</p>
           {e.period && <p style={{ ...BODY, fontSize: '0.85em' }}>{e.period}</p>}
           <RichText t={t} text={e.details} format={e.format} fallback="Describe what you achieved." />
+        </div>
+      ))}
+    </Sec>
+  )
+  const projectsSec = projects.length > 0 && (
+    <Sec t={t} title="Projects">
+      {projects.map((p, i) => (
+        <div key={i} style={{ marginBottom: '0.6em' }}>
+          <p style={{ ...BODY, color: t.ink, fontWeight: 600 }}>{p.name}{has(p.tech) ? `  |  ${p.tech}` : ''}</p>
+          {(has(p.period) || has(p.link)) && (
+            <p style={{ ...BODY, fontSize: '0.85em', wordBreak: 'break-word' }}>
+              {has(p.period) && p.period}
+              {has(p.period) && has(p.link) && '  |  '}
+              {has(p.link) && <Anchor url={p.link} plain={thumb} />}
+            </p>
+          )}
+          <RichText t={t} text={p.details} format={p.format} fallback="" />
         </div>
       ))}
     </Sec>
@@ -137,7 +191,11 @@ export function ResumePreview({ t, data: d, thumb = false }) {
       ))}
     </Sec>
   )
-  const skillsSec = <Sec t={t} title="Skills"><p style={BODY}>{skills.length ? skills.join(', ') : 'Your key skills'}</p></Sec>
+  const skillsSec = (
+    <Sec t={t} title={d.skillsTitle || 'Skills'}>
+      <p style={BODY}>{skills.length ? skills.join(', ') : 'Your key skills'}</p>
+    </Sec>
+  )
 
   return (
     <div style={{ containerType: 'inline-size', fontFamily: t.font, background: '#fff', overflow: thumb ? 'hidden' : 'visible', aspectRatio: thumb ? '8.5 / 11' : undefined }}>
@@ -146,11 +204,18 @@ export function ResumePreview({ t, data: d, thumb = false }) {
           <>
             <div style={{ width: '32%', background: t.tint, padding: '6cqw 3.5cqw', display: 'flex', flexDirection: 'column', gap: '1em' }}>
               {t.photo && avatar}
-              <Sec t={t} title="Contact"><p style={{ ...BODY, wordBreak: 'break-word', whiteSpace: 'pre-line' }}>{contact.split('  |  ').join('\n')}</p></Sec>
+              <Sec t={t} title="Contact">
+                <p style={{ ...BODY, wordBreak: 'break-word', whiteSpace: 'pre-line' }}>{contact.split('  |  ').join('\n')}</p>
+                {links.map((l, i) => (
+                  <p key={i} style={{ ...BODY, wordBreak: 'break-word' }}>
+                    <Anchor url={l.url} plain={thumb} />
+                  </p>
+                ))}
+              </Sec>
               {skillsSec}
             </div>
             <div style={{ flex: 1, padding: '6cqw 5cqw', display: 'flex', flexDirection: 'column', gap: '1em' }}>
-              {nameBlock}{summary}{exp}{edu}
+              {nameBlock}{summary}{exp}{projectsSec}{edu}
             </div>
           </>
         ) : (
@@ -159,7 +224,7 @@ export function ResumePreview({ t, data: d, thumb = false }) {
               {nameBlock}
               {banner && t.photo && avatar}
             </div>
-            {summary}{exp}{edu}{skillsSec}
+            {summary}{exp}{projectsSec}{edu}{skillsSec}
           </div>
         )}
       </div>

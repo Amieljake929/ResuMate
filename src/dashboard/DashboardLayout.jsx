@@ -6,7 +6,11 @@ import {
   Icon,
   HomeIcon,
   TemplateIcon,
-  FolderIcon,
+  LetterIcon,
+  ActivityIcon,
+  ShieldCheckIcon,
+  BriefcaseIcon,
+  ChatIcon,
   LogoutIcon,
   MenuIcon,
   BellIcon,
@@ -14,6 +18,7 @@ import {
   SettingsIcon,
   HelpIcon,
   ChevronDownIcon,
+  SparkIcon,
 } from './icons'
 
 const SidebarToggleIcon = (p) => (
@@ -23,17 +28,45 @@ const SidebarToggleIcon = (p) => (
   </Icon>
 )
 
-// Settings moved to the profile dropdown.
-const links = [
-  { to: '/dashboard', label: 'Overview', icon: HomeIcon, end: true },
-  { to: '/dashboard/templates', label: 'Templates', icon: TemplateIcon, alsoActiveOnEditor: true },
-  { to: '/dashboard/resumes', label: 'My Resumes', icon: FolderIcon },
+// `soon: true` links are placeholders until their pages exist.
+const NAV = [
+  {
+    label: 'Build',
+    items: [
+      { to: '/dashboard', label: 'Overview', icon: HomeIcon, end: true },
+      { to: '/dashboard/templates', label: 'Resume Templates', icon: TemplateIcon, alsoActiveOnEditor: true },
+      { to: '/dashboard/cover-letters', label: 'Cover Letter Templates', icon: LetterIcon, soon: true },
+      { to: '/dashboard/resumes', label: 'My Activities', icon: ActivityIcon },
+    ],
+  },
+  {
+    label: 'Career tools',
+    items: [
+      { to: '/dashboard/ats-checker', label: 'ATS Checker', icon: ShieldCheckIcon, soon: true },
+      { to: '/dashboard/job-tracker', label: 'Job Tracker', icon: BriefcaseIcon, soon: true },
+      { to: '/dashboard/interview-prep', label: 'Interview Prep', icon: ChatIcon, soon: true },
+    ],
+  },
 ]
 
 const MENU = [
   { to: '/dashboard/profile', label: 'Profile', icon: UserIcon },
   { to: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/dashboard/help', label: 'Help Center', icon: HelpIcon },
+]
+
+// Page title shown in the desktop top bar. First match wins.
+const TITLES = [
+  ['/dashboard/editor', 'Resume Editor'],
+  ['/dashboard/templates', 'Resume Templates'],
+  ['/dashboard/cover-letters', 'Cover Letter Templates'],
+  ['/dashboard/resumes', 'My Activities'],
+  ['/dashboard/ats-checker', 'ATS Checker'],
+  ['/dashboard/job-tracker', 'Job Tracker'],
+  ['/dashboard/interview-prep', 'Interview Prep'],
+  ['/dashboard/profile', 'Profile'],
+  ['/dashboard/settings', 'Settings'],
+  ['/dashboard/help', 'Help Center'],
 ]
 
 const FOCUS =
@@ -90,7 +123,7 @@ function NotificationButton() {
           <motion.div
             {...popover}
             style={{ transformOrigin: 'top right' }}
-            className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-[#e3ebf4] bg-white p-2 shadow-[0_18px_40px_rgba(11,31,58,0.14)]"
+            className="fixed left-3 right-3 top-[68px] z-50 rounded-xl border border-[#e3ebf4] bg-white p-2 shadow-[0_18px_40px_rgba(11,31,58,0.14)] sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72"
           >
             <p className="px-3 pb-2 pt-2 text-sm font-semibold text-[#0b1f3a]">Notifications</p>
             <div className="rounded-lg bg-[#f6faff] px-3 py-6 text-center">
@@ -104,7 +137,7 @@ function NotificationButton() {
   )
 }
 
-function ProfileMenu({ name, email, initials, onSignOut }) {
+function ProfileMenu({ name, email, onSignOut }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const close = () => setOpen(false)
@@ -118,16 +151,13 @@ function ProfileMenu({ name, email, initials, onSignOut }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`flex cursor-pointer items-center gap-2.5 rounded-full py-1 pl-1 pr-2 transition-colors duration-200 hover:bg-slate-100 sm:pr-3 ${
-          open ? 'bg-slate-100' : ''
+        className={`flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 transition-colors duration-200 sm:px-4 ${
+          open ? 'border-[#c9d8e8] bg-[#eef4fa]' : 'border-transparent hover:bg-slate-100'
         } ${FOCUS}`}
       >
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black text-xs font-semibold text-white">
-          {initials}
-        </span>
-        <span className="hidden max-w-[180px] truncate text-sm font-semibold text-slate-900 sm:block">{name}</span>
+        <span className="max-w-[96px] truncate text-sm font-semibold text-slate-900 sm:max-w-[220px]">{name}</span>
         <ChevronDownIcon
-          className={`h-4 w-4 text-slate-500 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
         />
       </motion.button>
 
@@ -206,8 +236,7 @@ export default function DashboardLayout() {
   }
 
   const name = user?.user_metadata?.full_name || user?.email || ''
-  const initials =
-    name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || 'U'
+  const pageTitle = TITLES.find(([p]) => location.pathname.startsWith(p))?.[1] ?? 'Overview'
 
   const handleSignOut = async () => {
     await signOut()
@@ -245,12 +274,12 @@ export default function DashboardLayout() {
 
         {/* Sidebar */}
         <aside
-          className={`fixed left-0 top-0 z-40 flex h-[100dvh] w-64 flex-col overflow-hidden border-r border-[#e3ebf4] bg-white px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 transition-[transform,translate,width,box-shadow] ${EASE} md:static md:h-auto md:translate-x-0 md:pb-5 md:shadow-none ${
+          className={`fixed left-0 top-0 z-40 flex h-[100dvh] w-64 flex-col overflow-hidden border-r border-[#e3ebf4] bg-white px-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 transition-[transform,translate,width,box-shadow] ${EASE} md:static md:h-auto md:translate-x-0 md:shadow-none ${
             collapsed ? 'md:w-[76px]' : ''
           } ${open ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none'}`}
         >
           {/* Brand + toggle */}
-          <div className="relative mb-6 h-14 shrink-0">
+          <div className="relative mb-4 h-14 shrink-0">
             <Link
               to="/dashboard"
               onClick={() => setOpen(false)}
@@ -273,55 +302,110 @@ export default function DashboardLayout() {
             </button>
           </div>
 
-          <p className={`mb-2 overflow-hidden whitespace-nowrap px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 ${fade}`}>Menu</p>
-          <nav className="flex min-h-0 flex-col gap-1 overflow-y-auto">
-            {links.map((l) => (
-              <NavLink
-                key={l.to}
-                to={l.to}
-                end={l.end}
-                title={collapsed ? l.label : undefined}
-                className={linkClass(l)}
-                onClick={() => setOpen(false)}
-              >
-                {({ isActive }) => {
-                  const active = isActive || (l.alsoActiveOnEditor && editorOpen)
-                  return (
-                    <>
-                      {active && (
-                        <motion.span
-                          layoutId="nav-active"
-                          transition={SPRING}
-                          className="absolute inset-0 rounded-lg bg-[#eef4fa]"
-                        />
-                      )}
-                      <l.icon className="relative h-5 w-5 shrink-0 text-black" />
-                      <span className={`relative ml-3 whitespace-nowrap ${fade}`}>{l.label}</span>
-                    </>
-                  )
-                }}
-              </NavLink>
+          <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {NAV.map((group, gi) => (
+              <div key={group.label} className={gi > 0 ? 'mt-5' : ''}>
+                <p className={`mb-1.5 overflow-hidden whitespace-nowrap px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 ${fade}`}>
+                  {group.label}
+                </p>
+                <div className="flex flex-col gap-1">
+                  {group.items.map((l) => (
+                    <NavLink
+                      key={l.to}
+                      to={l.to}
+                      end={l.end}
+                      title={collapsed ? l.label : undefined}
+                      className={linkClass(l)}
+                      onClick={() => setOpen(false)}
+                    >
+                      {({ isActive }) => {
+                        const active = isActive || (l.alsoActiveOnEditor && editorOpen)
+                        return (
+                          <>
+                            {active && (
+                              <>
+                                <motion.span
+                                  layoutId="nav-active"
+                                  transition={SPRING}
+                                  className="absolute inset-0 rounded-lg bg-[#eef4fa]"
+                                />
+                                <motion.span
+                                  layoutId="nav-bar"
+                                  transition={SPRING}
+                                  className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r bg-[#0b1f3a]"
+                                />
+                              </>
+                            )}
+                            <l.icon className="relative h-5 w-5 shrink-0 text-black" />
+                            <span className={`relative ml-3 whitespace-nowrap ${fade}`}>{l.label}</span>
+                            {l.soon && (
+                              <span className={`relative ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 ${fade}`}>
+                                Soon
+                              </span>
+                            )}
+                          </>
+                        )
+                      }}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
+
+          {/* Tip card: fades away when the sidebar is collapsed */}
+          <div
+            className={`mt-4 shrink-0 overflow-hidden rounded-xl border border-[#e3ebf4] bg-[#f6faff] p-3.5 ${fade} ${
+              collapsed ? 'md:pointer-events-none' : ''
+            }`}
+          >
+            <div className="flex items-center gap-2 text-[#0b1f3a]">
+              <SparkIcon className="h-4 w-4 shrink-0" />
+              <p className="whitespace-nowrap text-sm font-semibold">Quick tip</p>
+            </div>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+              Keep your resume to one page and lead each bullet with a result.
+            </p>
+            <Link
+              to="/dashboard/help"
+              onClick={() => setOpen(false)}
+              tabIndex={collapsed ? -1 : 0}
+              className={`mt-2 inline-block rounded text-xs font-bold text-[#0b1f3a] hover:text-[#2f6fa8] ${FOCUS}`}
+            >
+              Visit Help Center
+            </Link>
+          </div>
         </aside>
 
         {/* Main content */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Top bar: mobile shows menu + logo, both sizes show notifications | profile on the right */}
           <header className="relative z-20 flex h-16 shrink-0 items-center gap-2 border-b border-[#e3ebf4] bg-white/90 px-3 backdrop-blur md:px-8">
             <button
               onClick={() => setOpen(true)}
-              className={`grid h-10 w-10 cursor-pointer place-items-center rounded-lg text-black transition hover:bg-slate-100 md:hidden ${FOCUS}`}
+              className={`grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-lg text-black transition hover:bg-slate-100 md:hidden ${FOCUS}`}
               aria-label="Open menu"
             >
               <MenuIcon className="h-6 w-6" />
             </button>
-            <img src="/logo/resumate.png" alt="Resumate" className="h-11 w-auto md:hidden" />
 
-            <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
+            {/* Desktop: current page title */}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.h2
+                key={pageTitle}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="hidden text-base font-semibold text-[#0b1f3a] md:block"
+              >
+                {pageTitle}
+              </motion.h2>
+            </AnimatePresence>
+
+            <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
               <NotificationButton />
-              <span aria-hidden="true" className="h-6 w-px bg-[#dbe5f0]" />
-              <ProfileMenu name={name} email={user?.email} initials={initials} onSignOut={handleSignOut} />
+              <span aria-hidden="true" className="h-6 w-px shrink-0 bg-[#dbe5f0]" />
+              <ProfileMenu name={name} email={user?.email} onSignOut={handleSignOut} />
             </div>
           </header>
 
@@ -329,7 +413,7 @@ export default function DashboardLayout() {
             className={
               editorOpen
                 ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-                : 'min-h-0 flex-1 overflow-y-auto px-5 py-6 md:px-10 md:py-8'
+                : 'min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 md:px-10 md:py-8'
             }
           >
             {/* Re-keyed per route so each page eases in */}

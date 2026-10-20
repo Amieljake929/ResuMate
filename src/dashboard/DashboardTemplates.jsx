@@ -20,9 +20,9 @@ export function TemplateCard({ t }) {
     <motion.div whileHover={{ y: -4 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.25, ease: EASE }}>
       <Link
         to={`/dashboard/editor/${t.id}`}
-        className="group block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#5b9bd5]"
+        className="group block rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#5b9bd5]"
       >
-        <div className="relative overflow-hidden rounded-xl border border-[#dde8f3] bg-white shadow-sm transition-[border-color,box-shadow] duration-300 group-hover:border-[#5b9bd5] group-hover:shadow-[0_18px_40px_rgba(11,31,58,0.16)]">
+        <div className="relative overflow-hidden rounded-2xl border border-[#dde8f3] bg-white shadow-sm transition-[border-color,box-shadow] duration-300 group-hover:border-[#5b9bd5] group-hover:shadow-[0_18px_40px_rgba(11,31,58,0.16)]">
           <ResumePreview t={t} data={SAMPLE} thumb />
           <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-[#0b1f3a]/70 via-transparent to-transparent p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
             <span className="translate-y-2 rounded-lg bg-white px-4 py-2 text-sm font-bold text-[#0b1f3a] shadow-md transition-transform duration-300 group-hover:translate-y-0 group-focus-visible:translate-y-0">
@@ -30,7 +30,7 @@ export function TemplateCard({ t }) {
             </span>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="mt-3 flex items-center justify-between gap-2 px-0.5">
           <p className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-900">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t.accent }} />
             <span className="truncate">{t.name}</span>
@@ -57,52 +57,76 @@ export default function DashboardTemplates() {
     () => (filter === 'all' ? TEMPLATES : TEMPLATES.filter((t) => t.tags.includes(filter))),
     [filter]
   )
+  const counts = useMemo(() => {
+    const c = { all: TEMPLATES.length }
+    FILTERS.forEach((f) => {
+      if (f.id !== 'all') c[f.id] = TEMPLATES.filter((t) => t.tags.includes(f.id)).length
+    })
+    return c
+  }, [])
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0b1f3a]">Choose a template</h1>
-          <p className="mt-1 text-sm text-slate-600">Pick a design to start with. You can switch templates any time while editing.</p>
-        </div>
-        <p className="text-sm font-medium text-slate-500">{list.length} templates</p>
-      </div>
-
-      {/* Filters: scroll sideways on small screens, active pill glides between options */}
-      <div
-        role="group"
-        aria-label="Filter templates"
-        className="-mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      {/* Header card */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: EASE }}
+        className="rounded-3xl border border-[#e3ebf4] bg-white p-5 shadow-sm sm:p-7"
       >
-        {FILTERS.map((f) => {
-          const active = filter === f.id
-          return (
-            <motion.button
-              key={f.id}
-              type="button"
-              whileTap={{ scale: 0.96 }}
-              onClick={() => setFilter(f.id)}
-              aria-pressed={active}
-              className={`relative shrink-0 cursor-pointer rounded-full border px-4 py-1.5 text-sm font-bold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b9bd5] ${
-                active
-                  ? 'border-[#0b1f3a] text-white'
-                  : 'border-[#dde8f3] bg-white text-[#0b1f3a] hover:border-[#5b9bd5]'
-              }`}
-            >
-              {active && (
-                <motion.span
-                  layoutId="filter-pill"
-                  transition={{ type: 'spring', stiffness: 500, damping: 36 }}
-                  className="absolute inset-0 rounded-full bg-[#0b1f3a]"
-                />
-              )}
-              <span className="relative">{f.label}</span>
-            </motion.button>
-          )
-        })}
-      </div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[#0b1f3a] md:text-3xl">Resume templates</h1>
+            <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-slate-600">
+              Pick a design to start with. You can switch templates any time while editing.
+            </p>
+          </div>
+          <p className="rounded-full bg-[#eef4fa] px-3 py-1 text-sm font-semibold text-[#0b1f3a]">
+            {list.length} {list.length === 1 ? 'template' : 'templates'}
+          </p>
+        </div>
 
-      <motion.div layout className="mt-7 grid grid-cols-2 gap-4 pb-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
+        {/* Filters: scroll sideways on small screens, active pill glides between options */}
+        <div
+          role="group"
+          aria-label="Filter templates"
+          className="-mx-5 mt-6 flex gap-2 overflow-x-auto px-5 pb-1 sm:-mx-7 sm:px-7 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {FILTERS.map((f) => {
+            const active = filter === f.id
+            return (
+              <motion.button
+                key={f.id}
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => setFilter(f.id)}
+                aria-pressed={active}
+                className={`relative shrink-0 cursor-pointer rounded-full border px-4 py-1.5 text-sm font-bold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b9bd5] ${
+                  active
+                    ? 'border-[#0b1f3a] text-white'
+                    : 'border-[#dde8f3] bg-white text-[#0b1f3a] hover:border-[#5b9bd5]'
+                }`}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="filter-pill"
+                    transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+                    className="absolute inset-0 rounded-full bg-[#0b1f3a]"
+                  />
+                )}
+                <span className="relative">
+                  {f.label}
+                  <span className={`ml-1.5 text-xs font-semibold ${active ? 'text-white/70' : 'text-slate-400'}`}>
+                    {counts[f.id]}
+                  </span>
+                </span>
+              </motion.button>
+            )
+          })}
+        </div>
+      </motion.div>
+
+      <motion.div layout className="mt-8 grid grid-cols-2 gap-4 pb-4 sm:gap-6 md:grid-cols-3 xl:grid-cols-4">
         <AnimatePresence mode="popLayout" initial={false}>
           {list.map((t) => (
             <motion.div
@@ -118,6 +142,19 @@ export default function DashboardTemplates() {
           ))}
         </AnimatePresence>
       </motion.div>
+
+      {list.length === 0 && (
+        <div className="mt-8 rounded-2xl border border-dashed border-[#c9d8e8] bg-white px-6 py-14 text-center">
+          <p className="font-semibold text-slate-900">No templates match this filter</p>
+          <button
+            type="button"
+            onClick={() => setFilter('all')}
+            className="mt-3 cursor-pointer text-sm font-bold text-[#0b1f3a] hover:text-[#2f6fa8]"
+          >
+            Show all templates
+          </button>
+        </div>
+      )}
     </div>
   )
 }
