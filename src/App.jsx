@@ -71,7 +71,11 @@ function App() {
             <Route path="ats-checker" element={<AtsChecker />} />
             <Route path="job-tracker" element={<JobTracker />} />
             <Route path="interview-prep" element={<InterviewPrep />} />
+
+            {/* Placeholder pages: reached from the profile menu and the "Visit Help Center" link */}
+            <Route path="profile" element={<Placeholder title="Profile" />} />
             <Route path="settings" element={<Placeholder title="Settings" />} />
+            <Route path="help" element={<Placeholder title="Help Center" />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

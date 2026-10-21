@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { useAuth } from '../lib/AuthContext'
+import LoadingOverlay from '../components/LoadingOverlay'
 import {
   Icon,
   HomeIcon,
@@ -72,6 +73,9 @@ const FOCUS =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5b9bd5]'
 const EASE = 'duration-300 ease-[cubic-bezier(0.2,0.7,0.2,1)]'
 const SPRING = { type: 'spring', stiffness: 520, damping: 38 }
+
+// How long the sign out overlay stays up (ms). Matches the progress bar fill time.
+const SIGN_OUT_DELAY = 1500
 
 // Closes a popover on outside click / tap and on Escape.
 function useDismiss(open, close, ref) {
@@ -212,6 +216,7 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [open, setOpen] = useState(false) // mobile drawer
+  const [signingOut, setSigningOut] = useState(false) // full-screen sign out overlay
   const [pref, setPref] = useState(null) // desktop: null = automatic, true = collapsed, false = expanded
   const editor = useMatch('/dashboard/editor/:templateId')
   const editorOpen = !!editor
@@ -237,9 +242,19 @@ export default function DashboardLayout() {
   const name = user?.user_metadata?.full_name || user?.email || ''
   const pageTitle = TITLES.find(([p]) => location.pathname.startsWith(p))?.[1] ?? 'Overview'
 
+  // Show the loading overlay first and let the bar fill, then sign out and go to /signin.
+  // Signing out last keeps the overlay on screen, because clearing the user can
+  // unmount this layout (the protected route redirects right away).
   const handleSignOut = async () => {
-    await signOut()
-    navigate('/signin')
+    if (signingOut) return
+    setOpen(false)
+    setSigningOut(true)
+    await new Promise((resolve) => setTimeout(resolve, SIGN_OUT_DELAY))
+    try {
+      await signOut()
+    } finally {
+      navigate('/signin')
+    }
   }
 
   // Text fades out first when closing, and fades in slightly after the width opens.
@@ -254,6 +269,8 @@ export default function DashboardLayout() {
 
   return (
     <MotionConfig reducedMotion="user">
+      {signingOut && <LoadingOverlay message="Signing out…" duration={SIGN_OUT_DELAY} />}
+
       <div className="flex h-[100dvh] overflow-hidden bg-[#f4f7fb] font-['Jost',sans-serif] text-slate-900">
         {/* Mobile overlay */}
         <AnimatePresence>

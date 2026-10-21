@@ -57,13 +57,18 @@ export const EMPTY = {
 export const SAMPLE = {
   name: 'Amelia Reyes', title: 'Marketing Manager', email: 'amelia.reyes@email.com',
   phone: '+63 912 345 6789', location: 'Quezon City',
-  summary: 'Marketing manager with 8 years of experience leading campaigns that grow revenue and brand reach.',
+  summary: 'Marketing manager with 8 years of experience leading campaigns that grow revenue and brand reach. Skilled in digital strategy, team leadership, and turning customer data into clear, measurable results.',
   summaryFormat: { mode: 'paragraph', style: 'disc' },
   links: [{ type: 'LinkedIn', url: 'linkedin.com/in/ameliareyes' }],
   experience: [
     {
       kind: 'job', role: 'Senior Marketing Manager', company: 'Northwind Co.', period: '2021 to now',
       details: 'Led a team of six and raised qualified leads by 42%.\nLaunched three campaigns that doubled social engagement.',
+      format: { mode: 'bullets', style: 'disc' },
+    },
+    {
+      kind: 'job', role: 'Marketing Specialist', company: 'Bluepeak Digital', period: '2018 to 2021',
+      details: 'Managed a monthly ad budget of PHP 1.2M across search and social.\nCut cost per lead by 28% through weekly A/B testing.',
       format: { mode: 'bullets', style: 'disc' },
     },
     {
